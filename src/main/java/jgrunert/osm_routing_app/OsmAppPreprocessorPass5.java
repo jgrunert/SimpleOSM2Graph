@@ -15,8 +15,7 @@ import java.util.Map;
 import java.util.logging.Level;
 
 /**
- * Pass to remove Level-2 nodes from main data structure. Also removes loop
- * edges
+ * Pass to remove Level-2 nodes from main data structure. Also removes loop edges
  *
  * @author Jonas Grunert
  *
@@ -115,12 +114,8 @@ public class OsmAppPreprocessorPass5 {
 			ndTmp = 0;
 			edgesDifferTmp = false;
 
-			for (int iEdge = nodesEdgeOffset[iNd]; (iNd + 1 < nodesEdgeOffset.length
-					&& iEdge < nodesEdgeOffset[iNd + 1]) || (iNd + 1 == nodesEdgeOffset.length && iEdge < edgeCount); // Last
-																														// node
-																														// in
-																														// offset
-																														// array
+			for (int iEdge = nodesEdgeOffset[iNd]; (iNd + 1 < nodesEdgeOffset.length && iEdge < nodesEdgeOffset[iNd + 1])
+					|| (iNd + 1 == nodesEdgeOffset.length && iEdge < edgeCount); // Last node  in offset array
 					iEdge++) {
 				if (ndTmp == 0) {
 					edgeInfobitsTmp = edgesInfobits[iEdge];
@@ -181,8 +176,8 @@ public class OsmAppPreprocessorPass5 {
 		List<Integer> nodesKeptIndices = new ArrayList<>(nodesKeptCount); // Initialize
 																			// with
 																			// nodesKeptCount
-		// List<Integer> edgesKeptIndices = new ArrayList<>(nodesKeptCount); //
-		// Also use nodesKeptCount (at least this count)
+																			// List<Integer> edgesKeptIndices = new ArrayList<>(nodesKeptCount); //
+																			// Also use nodesKeptCount (at least this count)
 		Map<Integer, List<NodeFollowPath.Coord>> edgeRemovedCoords = new HashMap<>();
 		int edgeRemovedCoordsCount = 0;
 
@@ -197,16 +192,16 @@ public class OsmAppPreprocessorPass5 {
 			int nodeEdgeCount = 0;
 
 			// Follow and update edges if necesary
-			for (int iEdge = nodesEdgeOffset[iNd]; (iNd + 1 < nodesEdgeOffset.length
-					&& iEdge < nodesEdgeOffset[iNd + 1]) || (iNd + 1 == nodesEdgeOffset.length && iEdge < edgeCount); // Last
-																														// node
-																														// in
-																														// offset
-																														// array
+			for (int iEdge = nodesEdgeOffset[iNd]; (iNd + 1 < nodesEdgeOffset.length && iEdge < nodesEdgeOffset[iNd + 1])
+					|| (iNd + 1 == nodesEdgeOffset.length && iEdge < edgeCount); // Last
+					// node
+					// in
+					// offset
+					// array
 					iEdge++) {
 				// Follow edge path
-				NodeFollowPath followPath = followNodeEdge(iNd, iEdge, nodesEdgeOffset, nodesLat, nodesLon, edgeCount,
-						edgesTarget, edgesLengths, nodesToDelete);
+				NodeFollowPath followPath = followNodeEdge(iNd, iEdge, nodesEdgeOffset, nodesLat, nodesLon, edgeCount, edgesTarget,
+						edgesLengths, nodesToDelete);
 
 				if (followPath == null || followPath.Target == iNd) {
 					if (followPath == null) {
@@ -286,13 +281,12 @@ public class OsmAppPreprocessorPass5 {
 			nodesEdgeOffsetKept[iNd] = edgeOffsetTmp;
 
 			// Extract edges of node
-			for (int iEdge = nodesEdgeOffset[oldIndex]; (oldIndex + 1 < nodesEdgeOffset.length
-					&& iEdge < nodesEdgeOffset[oldIndex + 1])
+			for (int iEdge = nodesEdgeOffset[oldIndex]; (oldIndex + 1 < nodesEdgeOffset.length && iEdge < nodesEdgeOffset[oldIndex + 1])
 					|| (oldIndex + 1 == nodesEdgeOffset.length && iEdge < edgeCount); // Last
-																						// node
-																						// in
-																						// offset
-																						// array
+					// node
+					// in
+					// offset
+					// array
 					iEdge++) {
 				if (edgesToDelete[iEdge]) {
 					continue;
@@ -431,14 +425,14 @@ public class OsmAppPreprocessorPass5 {
 
 	/**
 	 * Follows edges as long as edges lead to deleted nodes
-	 * 
+	 *
 	 * @param nodeLast
 	 * @param nodeNext
 	 * @param nodesToDelete
 	 * @return
 	 */
-	private static NodeFollowPath followNodeEdge(int nodeLast, int edge, int[] nodesEdgeOffset, float[] nodesLat,
-			float[] nodesLon, int edgeCount, int[] edgesTarget, float[] edgesLengths, boolean[] nodesToDelete) {
+	private static NodeFollowPath followNodeEdge(int nodeLast, int edge, int[] nodesEdgeOffset, float[] nodesLat, float[] nodesLon,
+			int edgeCount, int[] edgesTarget, float[] edgesLengths, boolean[] nodesToDelete) {
 
 		int nodeNext = edgesTarget[edge];
 
@@ -451,13 +445,12 @@ public class OsmAppPreprocessorPass5 {
 
 			// Find edge to follow
 			int nextEdge = -1;
-			for (int iEdge = nodesEdgeOffset[nodeNext]; (nodeNext + 1 < nodesEdgeOffset.length
-					&& iEdge < nodesEdgeOffset[nodeNext + 1])
+			for (int iEdge = nodesEdgeOffset[nodeNext]; (nodeNext + 1 < nodesEdgeOffset.length && iEdge < nodesEdgeOffset[nodeNext + 1])
 					|| (nodeNext + 1 == nodesEdgeOffset.length && iEdge < edgeCount); // Last
-																						// node
-																						// in
-																						// offset
-																						// array
+					// node
+					// in
+					// offset
+					// array
 					iEdge++) {
 				if (edgesTarget[iEdge] == nodeLast) {
 					continue;
@@ -491,8 +484,8 @@ public class OsmAppPreprocessorPass5 {
 			}
 
 			// Return sum of edges followed recursively
-			NodeFollowPath follow = followNodeEdge(nodeNext, nextEdge, nodesEdgeOffset, nodesLat, nodesLon, edgeCount,
-					edgesTarget, edgesLengths, nodesToDelete);
+			NodeFollowPath follow = followNodeEdge(nodeNext, nextEdge, nodesEdgeOffset, nodesLat, nodesLon, edgeCount, edgesTarget,
+					edgesLengths, nodesToDelete);
 			if (follow == null) {
 				return null;
 			}

@@ -65,7 +65,7 @@ public class OsmAppPreprocessor {
 			// Start preprocessing
 			LOG.info("Starting preprocessing passes");
 
-			OsmAppPreprocessorPass1.doPass(inFilePath, outDirPath);
+			new OsmAppPreprocessorPass1().doPass(inFilePath, outDirPath);
 			OsmAppPreprocessorPass2.doPass(inFilePath, outDirPath);
 			OsmAppPreprocessorPass3.doPass(outDirPath);
 			OsmAppPreprocessorPass4.doPass(outDirPath);
