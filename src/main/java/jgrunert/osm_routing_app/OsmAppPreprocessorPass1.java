@@ -20,11 +20,17 @@ import java.util.logging.Level;
 
 import org.openstreetmap.osmosis.core.container.v0_6.EntityContainer;
 import org.openstreetmap.osmosis.core.domain.v0_6.Entity;
+import org.openstreetmap.osmosis.core.domain.v0_6.Node;
 import org.openstreetmap.osmosis.core.domain.v0_6.Tag;
 import org.openstreetmap.osmosis.core.domain.v0_6.Way;
 import org.openstreetmap.osmosis.core.domain.v0_6.WayNode;
 import org.openstreetmap.osmosis.core.task.v0_6.RunnableSource;
 import org.openstreetmap.osmosis.core.task.v0_6.Sink;
+
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 
 /**
  * First processing pass, parses input file, pre filtering, searches edges.
@@ -34,24 +40,28 @@ import org.openstreetmap.osmosis.core.task.v0_6.Sink;
  */
 public class OsmAppPreprocessorPass1 {
 
-	static int relevantWays = 0;
-	static int ways = 0;
-	static int relevantWayNodeCounter = 0;
-	static int nodes = 0;
-
 	static int maxNodesPerWay = 0;
 	static int maxWaysPerNode = 0;
 
-	static int totalElements = 267101283;
 	static int elementsPass1 = 0;
 	static int elementsPass2 = 0;
 
 	static int BUFFER_MAX_WAYNODES = 100000000;
 	static int BUFFER_MAX_WAYSPERNODE = 20;
 
+
+
+	static int totalWayCount = 0;
+	static int totalNodeCount = 0;
+	static int relevantWayNodeCount = 0;
+
+	static LongSet relevantWays = new LongOpenHashSet();
+	static Long2ObjectOpenHashMap<LongArrayList> relevantWayNodes = new Long2ObjectOpenHashMap<LongArrayList>();
+
+
 	// static List<HighwayInfos> highways = new ArrayList<>();
-	static int highwayCount = 0;
-	static List<Long> waypointIds = new ArrayList<>();
+	// IDs of all relevant waypoint nodes
+	// static List<Long> waypointIds = new ArrayList<>();
 
 
 	public static void main(String[] args) {
@@ -68,29 +78,19 @@ public class OsmAppPreprocessorPass1 {
 
 
 	public static void doPass(String inFile, String outDir) throws Exception {
-
-
-		// PrintWriter highwayCsvAllWriter = new PrintWriter(new File(outDir +
-		// File.seperator + "highways-processed-all.csv"));
-
 		long startTime = System.currentTimeMillis();
 
+		OsmAppPreprocessor.LOG.info("OSM Preprocessor Pass1.a");
 
-		OsmAppPreprocessor.LOG.info("OSM Preprocessor Pass1 v03");
 
 
 		// Map<Long, Short> waysPerNode = new HashMap<>();
 
 		// List of all highways, Int32-index in this array will later be their
-		// index
-
 		// Pass 1 - read highways
 		{
-			OsmAppPreprocessor.LOG.info("Starting Pass 1");
 
-			// PrintWriter highwayCsvWriter = new PrintWriter(new File(outDir +
-			// File.seperator + "highways-processed.csv"));
-
+			OsmAppPreprocessor.LOG.info("Starting Pass1a");
 
 			ObjectOutputStream highwaysTempWriter = new ObjectOutputStream(new BufferedOutputStream(
 					new FileOutputStream(outDir + File.separator + "pass1-temp-highways.bin")));
@@ -102,6 +102,7 @@ public class OsmAppPreprocessorPass1 {
 					Entity entity = entityContainer.getEntity();
 
 					if (entity instanceof Way) {
+						totalWayCount++;
 						Way way = (Way) entity;
 
 						String highway = null;
@@ -150,9 +151,15 @@ public class OsmAppPreprocessorPass1 {
 									// highwayBinWriter.writeBoolean(hw.Car);
 									// highwayBinWriter.writeBoolean(hw.Pedestrian);
 									// highwayBinWriter.writeBoolean(hw.Oneway);
-									relevantWays++;
+									relevantWays.add(entity.getId());
 
 									for (WayNode waynode : way.getWayNodes()) {
+										LongArrayList nodeWays = relevantWayNodes.get(waynode.getNodeId());
+										if (nodeWays == null) {
+											nodeWays = new LongArrayList();
+											relevantWayNodes.put(waynode.getNodeId(), nodeWays);
+										}
+										nodeWays.add(entity.getId());
 										// Short ways =
 										// waysPerNode.get(waynode.getNodeId());
 										// if(ways == null) { ways = 0; }
@@ -163,7 +170,8 @@ public class OsmAppPreprocessorPass1 {
 										// waysPerNode.put(waynode.getNodeId(),
 										// ways);
 										// waynodes.add(waynode.getNodeId());
-										waypointIds.add(waynode.getNodeId());
+
+										// waypointIds.add(waynode.getNodeId());
 									}
 
 									hw.wayNodeIds = new long[way.getWayNodes().size()];
@@ -171,7 +179,6 @@ public class OsmAppPreprocessorPass1 {
 										hw.wayNodeIds[i] = way.getWayNodes().get(i).getNodeId();
 									}
 
-									highwayCount++;
 									highwaysTempWriter.writeObject(hw);
 
 									maxNodesPerWay = Math.max(maxNodesPerWay, way.getWayNodes().size());
@@ -186,13 +193,15 @@ public class OsmAppPreprocessorPass1 {
 						catch (Exception e) {
 							e.printStackTrace();
 						}
-						ways++;
+					}
+					else if (entity instanceof Node) {
+						totalNodeCount++;
 					}
 
 					elementsPass1++;
 					if ((elementsPass1 % 1000000) == 0) {
-						OsmAppPreprocessor.LOG.info("Loaded " + elementsPass1 + " elements ("
-								+ (int) (((float) elementsPass1 / totalElements) * 100) + "%)");
+						System.out.println(String.format("Pass1a Loaded %d elements, %d nodes, %d ways", elementsPass1,
+								totalNodeCount, totalWayCount));
 					}
 				}
 
@@ -240,7 +249,8 @@ public class OsmAppPreprocessorPass1 {
 
 			// highwayCsvWriter.close();
 
-			OsmAppPreprocessor.LOG.info("Finised pass 1 part 1/2 - loading");
+			OsmAppPreprocessor.LOG.info(String.format("Finished Pass1a part 1/2 - loading Nodes %d/%d Ways %d/%d",
+					totalNodeCount, relevantWayNodeCount, totalWayCount, relevantWays.size()));
 			OsmAppPreprocessor.LOG.info("Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 		}
 
@@ -300,15 +310,15 @@ public class OsmAppPreprocessorPass1 {
 		// in
 		DataOutputStream highwayBinWriter = new DataOutputStream(
 				new BufferedOutputStream(new FileOutputStream(outDir + File.separator + "pass1-highways.bin")));
-		highwayBinWriter.writeInt(highwayCount);
+		highwayBinWriter.writeInt(relevantWays.size());
 
 		OsmAppPreprocessor.LOG.info("Start finding waysOfNodes");
 		List<List<Integer>> waysOfNodes = new ArrayList<List<Integer>>(waypointIdsSetArray.length);
 		for (int i = 0; i < waypointIdsSetArray.length; i++) {
 			waysOfNodes.add(new LinkedList<Integer>());
 		}
-		int percAmnt = highwayCount / 100;
-		for (int i = 0; i < highwayCount; i++) {
+		int percAmnt = relevantWays.size() / 100;
+		for (int i = 0; i < relevantWays.size(); i++) {
 			HighwayInfos hw = (HighwayInfos) highwaysTempReader.readObject();
 
 			highwayBinWriter.writeByte(hw.InfoBits);
@@ -374,8 +384,8 @@ public class OsmAppPreprocessorPass1 {
 
 
 		OsmAppPreprocessor.LOG.info("Pass 1 finished");
-		OsmAppPreprocessor.LOG.info("Relevant ways: " + relevantWays + ", total ways: " + ways);
-		OsmAppPreprocessor.LOG.info("Relevant waynodes: " + relevantWayNodeCounter + ", total nodes: " + nodes);
+		OsmAppPreprocessor.LOG.info("Relevant ways: " + relevantWays.size() + ", total ways: " + totalWayCount);
+		OsmAppPreprocessor.LOG.info("Relevant waynodes: " + relevantWayNodeCount + ", total nodes: " + totalNodeCount);
 		OsmAppPreprocessor.LOG.info("Max nodes per way: " + maxNodesPerWay);
 		OsmAppPreprocessor.LOG.info("Max ways per node: " + maxWaysPerNode);
 

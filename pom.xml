@@ -3,11 +3,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>jgrunert</groupId>
-	<artifactId>osm-conversion-pipeline</artifactId>
+	<artifactId>simple-osm-2graph</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
-	<name>osm-conversion-pipeline</name>
+	<name>SimpleOSM2Graph</name>
 	<url>http://maven.apache.org</url>
 
 	<properties>
@@ -24,6 +24,11 @@
 			<groupId>net.sf.geographiclib</groupId>
 			<artifactId>GeographicLib-Java</artifactId>
 			<version>1.45</version>
+		</dependency>
+		<dependency>
+			<groupId>it.unimi.dsi</groupId>
+			<artifactId>fastutil</artifactId>
+			<version>7.0.13</version>
 		</dependency>
 	</dependencies>
 

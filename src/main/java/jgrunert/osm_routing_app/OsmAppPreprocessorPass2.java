@@ -37,7 +37,7 @@ public class OsmAppPreprocessorPass2 {
 	static int maxNodesPerWay = 0;
 	static int maxWaysPerNode = 0;
 
-	static int totalElements = 267101283;
+	// static int totalElements = 267101283;
 	static int elementsPass1 = 0;
 	static int elementsPass2 = 0;
 
