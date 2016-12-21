@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.openstreetmap.osmosis.core.domain.v0_6.WayNode;
 import org.openstreetmap.osmosis.core.task.v0_6.RunnableSource;
 import org.openstreetmap.osmosis.core.task.v0_6.Sink;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 
@@ -55,15 +57,19 @@ public class OsmAppPreprocessorPass1 {
 
 	//private Long2IntMap relevantWayIdMap = new Long2IntOpenHashMap();
 
+	// Temporary storage of ways, later converted to edges
 	// Mapping from long OSM ID to integer assigned ID
 	private Long2IntMap relevantNodeIdMap = new Long2IntOpenHashMap();
+	private List<HighwayInfo> relevantWays = new ArrayList<>();
+
+	// Nodes, converted from OSM nodes
+	private int relevantNodeCount;
 	private int relevantNodesFound = 0;
 	private double[] relevantNodeLat;
 	private double[] relevantNodeLon;
+	private IntArrayList[] relevantNodeEdges;
 
-	// Temporary storage of ways, later converted to edges
-	private List<HighwayInfo> relevantWays = new ArrayList<>();
-	// Edges, convered from ways
+	// Edges, convered from OSM ways
 	private int edgeCount;
 	private int[] wayEdgeNodes0;
 	private int[] wayEdgeNodes1;
@@ -91,9 +97,8 @@ public class OsmAppPreprocessorPass1 {
 
 
 	public void doPass(String inFile, String outDir) throws Exception {
+		OsmAppPreprocessor.LOG.info("OSM Preprocessor Pass1");
 		long startTime = System.currentTimeMillis();
-
-		OsmAppPreprocessor.LOG.info("OSM Preprocessor Pass1.a");
 
 		// List of all highways, assign Int32 Ids to edges and nodes
 		// Pass 1 - read highways
@@ -103,8 +108,16 @@ public class OsmAppPreprocessorPass1 {
 
 		// Calculate all edges from ways
 		calculateWayEdges();
-		// Can throw away highways now, already converted to edges
-		relevantWays.clear();
+		// Can throw away temporary highways and node mappings now, already converted ways to edges
+		relevantNodeIdMap = null;
+		relevantWays = null;
+
+		findEdgeNodes();
+
+		output(outDir + File.separator + "output.txt");
+
+
+		OsmAppPreprocessor.LOG.info("Finished Pass 1. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 
 		//
 		//		// Between pass 1 and 2
@@ -235,8 +248,8 @@ public class OsmAppPreprocessorPass1 {
 
 
 		OsmAppPreprocessor.LOG.info("Pass 1 finished");
-		OsmAppPreprocessor.LOG.info("Relevant ways: " + relevantWays.size() + ", total ways: " + totalWayCount);
-		OsmAppPreprocessor.LOG.info("Relevant waynodes: " + relevantNodeIdMap.size() + ", total nodes: " + totalNodeCount);
+		OsmAppPreprocessor.LOG.info("Relevant edges: " + edgeCount + ", total ways: " + totalWayCount);
+		OsmAppPreprocessor.LOG.info("Relevant waynodes: " + relevantNodeCount + ", total nodes: " + totalNodeCount);
 		//		OsmAppPreprocessor.LOG.info("Max nodes per way: " + maxNodesPerWay);
 		//		OsmAppPreprocessor.LOG.info("Max ways per node: " + maxWaysPerNode);
 
@@ -517,10 +530,15 @@ public class OsmAppPreprocessorPass1 {
 
 		if (relevantNodesFound == relevantNodeIdMap.size()) OsmAppPreprocessor.LOG.info("All relevant nodes found");
 		else OsmAppPreprocessor.LOG.info("Not all relevant nodes found, only " + relevantNodesFound + " of " + relevantNodeIdMap.size());
+		relevantNodeCount = relevantNodeIdMap.size();
 
 		OsmAppPreprocessor.LOG.info("Finished Pass 1b. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 	}
 
+
+	/**
+	 * Finds and calculates all edges on ways
+	 */
 	private void calculateWayEdges() {
 		OsmAppPreprocessor.LOG.info("Starting Pass 1c calculateWayEdges");
 		long startTime = System.currentTimeMillis();
@@ -563,6 +581,45 @@ public class OsmAppPreprocessorPass1 {
 		wayEdgeInfoBits[iEdge] = hw.InfoBits;
 		wayEdgeMaxSpeeds[iEdge] = hw.MaxSpeed;
 		wayEdgeLengths[iEdge] = dist;
+	}
+
+
+	/**
+	 * Finds all nodes for edges.
+	 */
+	private void findEdgeNodes() {
+		relevantNodeEdges = new IntArrayList[relevantNodeCount];
+		for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
+			relevantNodeEdges[iNode] = new IntArrayList();
+		}
+
+		for (int iEdge = 0; iEdge < edgeCount; iEdge++) {
+			relevantNodeEdges[wayEdgeNodes0[iEdge]].add(iEdge);
+		}
+	}
+
+
+	private void output(String outFile) {
+		try (PrintWriter writer = new PrintWriter(outFile)) {
+			for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
+				IntArrayList edges = relevantNodeEdges[iNode];
+				if (edges.size() > 0) {
+					writer.println(iNode);
+					for (int edge : edges) {
+						int otherNode;
+						if (wayEdgeNodes0[edge] == iNode) otherNode = wayEdgeNodes1[edge];
+						else otherNode = wayEdgeNodes0[edge];
+						writer.println("\t" + otherNode + "\t" + wayEdgeLengths[edge]); // TODO Use time, dist/speed?
+					}
+				}
+			}
+		}
+		catch (FileNotFoundException e) {
+			OsmAppPreprocessor.LOG.severe("Failure at main: " + e);
+			e.printStackTrace();
+		}
+
+		OsmAppPreprocessor.LOG.info("output finished");
 	}
 
 
