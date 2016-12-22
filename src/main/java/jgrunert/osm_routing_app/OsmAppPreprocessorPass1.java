@@ -67,7 +67,8 @@ public class OsmAppPreprocessorPass1 {
 	private int relevantNodesFound = 0;
 	private double[] relevantNodeLat;
 	private double[] relevantNodeLon;
-	private IntArrayList[] relevantNodeEdges;
+	private IntArrayList[] relevantNodeEdgeIDs;
+	private IntArrayList[] relevantNodeEdgeTargets;
 
 	// Edges, convered from OSM ways
 	private int edgeCount;
@@ -559,8 +560,8 @@ public class OsmAppPreprocessorPass1 {
 		int iEdge = 0;
 		for (HighwayInfo hw : relevantWays) {
 			for (int iWp = 1; iWp < hw.wayNodeIds.length; iWp++) {
-				int wp0 = relevantNodeIdMap.get(hw.wayNodeIds[0]);
-				int wp1 = relevantNodeIdMap.get(hw.wayNodeIds[1]);
+				int wp0 = relevantNodeIdMap.get(hw.wayNodeIds[iWp - 1]);
+				int wp1 = relevantNodeIdMap.get(hw.wayNodeIds[iWp]);
 				double dist = calcGeoLength(wp0, wp1);
 
 				evaluateEdge(wp0, wp1, dist, hw, iEdge);
@@ -576,6 +577,10 @@ public class OsmAppPreprocessorPass1 {
 	}
 
 	private void evaluateEdge(int wp0, int wp1, double dist, HighwayInfo hw, int iEdge) {
+		if (wp0 == 0) {
+			System.out.println();
+		}
+
 		wayEdgeNodes0[iEdge] = wp0;
 		wayEdgeNodes1[iEdge] = wp1;
 		wayEdgeInfoBits[iEdge] = hw.InfoBits;
@@ -588,13 +593,21 @@ public class OsmAppPreprocessorPass1 {
 	 * Finds all nodes for edges.
 	 */
 	private void findEdgeNodes() {
-		relevantNodeEdges = new IntArrayList[relevantNodeCount];
+		relevantNodeEdgeIDs = new IntArrayList[relevantNodeCount];
+		relevantNodeEdgeTargets = new IntArrayList[relevantNodeCount];
 		for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
-			relevantNodeEdges[iNode] = new IntArrayList();
+			relevantNodeEdgeIDs[iNode] = new IntArrayList();
+			relevantNodeEdgeTargets[iNode] = new IntArrayList();
 		}
 
 		for (int iEdge = 0; iEdge < edgeCount; iEdge++) {
-			relevantNodeEdges[wayEdgeNodes0[iEdge]].add(iEdge);
+			int edgeSource = wayEdgeNodes0[iEdge];
+			int edgeTarget = wayEdgeNodes1[iEdge];
+
+			if (!relevantNodeEdgeTargets[edgeSource].contains(edgeTarget)) {
+				relevantNodeEdgeIDs[edgeSource].add(iEdge);
+				relevantNodeEdgeTargets[edgeSource].add(edgeTarget);
+			}
 		}
 	}
 
@@ -602,7 +615,7 @@ public class OsmAppPreprocessorPass1 {
 	private void output(String outFile) {
 		try (PrintWriter writer = new PrintWriter(outFile)) {
 			for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
-				IntArrayList edges = relevantNodeEdges[iNode];
+				IntArrayList edges = relevantNodeEdgeIDs[iNode];
 				if (edges.size() > 0) {
 					writer.println(iNode);
 					for (int edge : edges) {
