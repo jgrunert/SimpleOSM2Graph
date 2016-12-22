@@ -589,6 +589,8 @@ public class OsmAppPreprocessorPass1 {
 	}
 
 
+	private int duplicatesEdges = 0;
+
 	/**
 	 * Finds all nodes for edges.
 	 */
@@ -608,7 +610,12 @@ public class OsmAppPreprocessorPass1 {
 				relevantNodeEdgeIDs[edgeSource].add(iEdge);
 				relevantNodeEdgeTargets[edgeSource].add(edgeTarget);
 			}
+			else {
+				duplicatesEdges++;
+			}
 		}
+
+		OsmAppPreprocessor.LOG.info("findEdgeNodes finished, " + edgeCount + " edges, " + duplicatesEdges + " duplicates");
 	}
 
 
@@ -637,7 +644,6 @@ public class OsmAppPreprocessorPass1 {
 
 
 
-	@SuppressWarnings("unused")
 	private static class HighwayInfo implements Serializable {
 
 		private static final long serialVersionUID = -1195125473333000206L;
