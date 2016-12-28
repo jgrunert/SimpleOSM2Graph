@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -116,142 +117,19 @@ public class OsmAppPreprocessorPass1 {
 		relevantNodeIdMap = null;
 		relevantWays = null;
 
+		// Find all edges of each node
 		findEdgeNodes();
 
-		outputBinary(outDir + File.separator + "graph.bin");
+		// Remove duplicate edges and circle edges
+		removeRedundantEdges();
 
-		// TODO remove duplicate edges?
 		// TODO remove Level-2, remove unused
+
+		outputBinary(outDir + File.separator + "graph.bin");
 
 
 		OsmAppPreprocessor.LOG.info("Finished Pass 1. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 
-		//
-		//		// Between pass 1 and 2
-		//		// Sort waypointIds
-		//		OsmAppPreprocessor.LOG.info("Start sorting waypointIds with size " + waypointIds.size());
-		//		Collections.sort(waypointIds);
-		//		OsmAppPreprocessor.LOG.info("Sorted waypointIds");
-		//
-		//		// Create sorted waypointIdsSet. It maps old to new indices: newIndex ==
-		//		// waypointIdsSet.indexOf(oldIndex)
-		//		OsmAppPreprocessor.LOG.info("Start creating waypointIdsSet");
-		//		// Find out number of unique waypoints
-		//		int waypointIdCount = 1;
-		//		long lastIndex = waypointIds.get(0);
-		//		for (int i = 1; i < waypointIds.size(); i++) {
-		//			if (waypointIds.get(i) != lastIndex) {
-		//				lastIndex = waypointIds.get(i);
-		//				waypointIdCount++;
-		//			}
-		//		}
-		//
-		//		long[] waypointIdsSetArray = new long[waypointIdCount];
-		//		lastIndex = waypointIds.get(0);
-		//		waypointIdsSetArray[0] = lastIndex;
-		//		int waypointIdIndex = 1;
-		//		for (int i = 1; i < waypointIds.size(); i++) {
-		//			if (waypointIds.get(i) != lastIndex) {
-		//				lastIndex = waypointIds.get(i);
-		//				waypointIdsSetArray[waypointIdIndex] = lastIndex;
-		//				waypointIdIndex++;
-		//			}
-		//		}
-		//		OsmAppPreprocessor.LOG.info("Finished creating waypointIdsSet withsize " + waypointIdsSetArray.length);
-		//		OsmAppPreprocessor.LOG.info("Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
-		//
-		//		// Idea: Sort by location? Sort by ways (in next step)? Are ways sorted?
-		//
-		//		// Save waypointIdsSet
-		//		OsmAppPreprocessor.LOG.info("Start saving waypointIdsSet");
-		//		ObjectOutputStream waypointIdsWriter = new ObjectOutputStream(
-		//				new BufferedOutputStream(new FileOutputStream(outDir + File.separator + "pass1-waynodeIds.bin")));
-		//		waypointIdsWriter.writeObject(waypointIdsSetArray);
-		//		int percTmp100 = waypointIdsSetArray.length / 100;
-		//		waypointIdsWriter.close();
-		//		OsmAppPreprocessor.LOG.info("Finished saving waypointIdsSet");
-
-		//
-		//
-		//		// Evaluate and save waypoint highway relations
-		//		ObjectInputStream highwaysTempReader = new ObjectInputStream(
-		//				new BufferedInputStream(new FileInputStream(outDir + File.separator + "pass1-temp-highways.bin")));
-		//
-		//		// List of Lists for each node with indices of all ways he is involved
-		//		// in
-		//		DataOutputStream highwayBinWriter = new DataOutputStream(
-		//				new BufferedOutputStream(new FileOutputStream(outDir + File.separator + "pass1-highways.bin")));
-		//		highwayBinWriter.writeInt(relevantWays.size());
-		//
-		//		OsmAppPreprocessor.LOG.info("Start finding waysOfNodes");
-		//		List<List<Integer>> waysOfNodes = new ArrayList<List<Integer>>(waypointIdsSetArray.length);
-		//		for (int i = 0; i < waypointIdsSetArray.length; i++) {
-		//			waysOfNodes.add(new LinkedList<Integer>());
-		//		}
-		//		int percAmnt = relevantWays.size() / 100;
-		//		for (int i = 0; i < relevantWays.size(); i++) {
-		//			HighwayInfos hw = (HighwayInfos) highwaysTempReader.readObject();
-		//
-		//			highwayBinWriter.writeByte(hw.InfoBits);
-		//			highwayBinWriter.writeBoolean(hw.Oneway);
-		//			highwayBinWriter.writeByte((byte) hw.MaxSpeed);
-		//			highwayBinWriter.writeInt(hw.wayNodeIds.length);
-		//
-		//			for (int iWn = 0; iWn < hw.wayNodeIds.length; iWn++) {
-		//				long wnode = hw.wayNodeIds[iWn];
-		//				int nodeIndex = Arrays.binarySearch(waypointIdsSetArray, wnode);
-		//				if (nodeIndex > 0) {
-		//					highwayBinWriter.writeInt(nodeIndex);
-		//					waysOfNodes.get(nodeIndex).add(i);
-		//				}
-		//				else {
-		//					// Cannot find node with this ID
-		//					highwayBinWriter.writeInt(-1);
-		//				}
-		//			}
-		//			if (i % percAmnt == 0) {
-		//				OsmAppPreprocessor.LOG.info((i / percAmnt) + "% finding waysOfNodes");
-		//			}
-		//		}
-		//		highwayBinWriter.close();
-		//		highwaysTempReader.close();
-		//		OsmAppPreprocessor.LOG.info("Finished finding waysOfNodes");
-		//		OsmAppPreprocessor.LOG.info("Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
-		//
-		//
-		//		// Clean up highways
-		//		OsmAppPreprocessor.LOG.info("Start clean up highways");
-		//		OsmAppPreprocessor.LOG.info("Finished clean up highways");
-		//
-		//
-		//		// Save waysOfNodes
-		//		OsmAppPreprocessor.LOG.info("Start saving waysOfNodes");
-		//		ObjectOutputStream waysOfNodesWriter = new ObjectOutputStream(
-		//				new BufferedOutputStream(new FileOutputStream(outDir + File.separator + "pass1-waysOfNodes.bin")));
-		//		waysOfNodesWriter.writeInt(waysOfNodes.size());
-		//		percTmp100 = waysOfNodes.size() / 100;
-		//		for (int i = 0; i < waysOfNodes.size(); i++) {
-		//			List<Integer> nodeWays = waysOfNodes.get(i);
-		//			waysOfNodesWriter.writeObject(nodeWays.toArray(new Integer[0]));
-		//			// waysOfNodesWriter.writeInt(nodeWays.size());
-		//			// for(int id : nodeWays) {
-		//			// waysOfNodesWriter.writeInt(id);
-		//			// }
-		//			waysOfNodes.set(i, null);
-		//			if (i % percTmp100 == 0) {
-		//				OsmAppPreprocessor.LOG.info(i / percTmp100 + "% save waysOfNodes");
-		//			}
-		//		}
-		//		waysOfNodesWriter.close();
-		//		OsmAppPreprocessor.LOG.info("Finished saving waysOfNodesWriter");
-		//
-		//
-		//		// Clean up waysOfNodes
-		//		OsmAppPreprocessor.LOG.info("Start clean up waysOfNodes");
-		//		waysOfNodes.clear();
-		//		waysOfNodes = null;
-		//		OsmAppPreprocessor.LOG.info("Finished clean up waysOfNodes");
-		//
 
 
 		OsmAppPreprocessor.LOG.info("Pass 1 finished");
@@ -585,10 +463,8 @@ public class OsmAppPreprocessorPass1 {
 	}
 
 
-	private int duplicatesEdges = 0;
-
 	/**
-	 * Finds all nodes for edges.
+	 * Finds all edges of each node. Creates relevantNodeEdgeIDs which is quite RAM consuming.
 	 */
 	private void findEdgeNodes() {
 		OsmAppPreprocessor.LOG.info("findEdgeNodes starting");
@@ -621,7 +497,47 @@ public class OsmAppPreprocessorPass1 {
 			}
 		}
 
-		OsmAppPreprocessor.LOG.info("findEdgeNodes finished, " + edgeCount + " edges, " + duplicatesEdges + " duplicates");
+		OsmAppPreprocessor.LOG.info("findEdgeNodes finished, " + edgeCount + " edges");
+	}
+
+
+	/**
+	 * Removes duplicate and circle edges
+	 */
+	private void removeRedundantEdges() {
+		OsmAppPreprocessor.LOG.info("removeRedundantEdges starting");
+
+		int duplicateEdges = 0;
+		int circleEdges = 0;
+
+		HashSet<Integer> targetsTmp = new HashSet<>();
+		for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
+			IntArrayList edges = relevantNodeEdgeIDs[iNode];
+			for (int iEdge = 0; iEdge < edges.size(); iEdge++) {
+				int edge = edges.getInt(iEdge);
+				int target;
+				if (wayEdgeNodes0[edge] == iNode) target = wayEdgeNodes1[edge];
+				else target = wayEdgeNodes0[edge];
+
+				if (target == iNode) {
+					circleEdges++;
+					edges.removeInt(iEdge);
+					iEdge--;
+				}
+				else if (targetsTmp.contains(target)) {
+					duplicateEdges++;
+					edges.removeInt(iEdge);
+					iEdge--;
+				}
+				else {
+					targetsTmp.add(target);
+				}
+			}
+			targetsTmp.clear();
+		}
+
+		OsmAppPreprocessor.LOG
+				.info("removeRedundantEdges finished, removed " + duplicateEdges + " duplicates and " + circleEdges + " circles");
 	}
 
 
