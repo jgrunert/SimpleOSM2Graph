@@ -1,9 +1,12 @@
 package jgrunert.osm_routing_app;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
@@ -68,7 +71,7 @@ public class OsmAppPreprocessorPass1 {
 	private double[] relevantNodeLat;
 	private double[] relevantNodeLon;
 	private IntArrayList[] relevantNodeEdgeIDs;
-	private IntArrayList[] relevantNodeEdgeTargets;
+	//private IntArrayList[] relevantNodeEdgeTargets;
 
 	// Edges, convered from OSM ways
 	private int edgeCount;
@@ -115,7 +118,10 @@ public class OsmAppPreprocessorPass1 {
 
 		findEdgeNodes();
 
-		output(outDir + File.separator + "output.txt");
+		outputBinary(outDir + File.separator + "graph.bin");
+
+		// TODO remove duplicate edges?
+		// TODO remove Level-2, remove unused
 
 
 		OsmAppPreprocessor.LOG.info("Finished Pass 1. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
@@ -468,16 +474,6 @@ public class OsmAppPreprocessorPass1 {
 						relevantNodesFound++;
 					}
 				}
-				//				else if (entity instanceof Way) {
-				//					Way way = (Way) entity;
-				//					int id = relevantWayIdMap.get(way.getId());
-				//					List<WayNode> wayNodes = way.getWayNodes();
-				//
-				//					if (wayNodes.size() >= 2) {
-				//						wayNodes0[id] = relevantNodeIdMap.get(wayNodes.get(0).getNodeId());
-				//						wayNodes1[id] = relevantNodeIdMap.get(wayNodes.get(1).getNodeId());
-				//					}
-				//				}
 
 				processedOsmElementsTmp++;
 				if ((processedOsmElementsTmp % 1000000) == 0) {
@@ -573,7 +569,7 @@ public class OsmAppPreprocessorPass1 {
 			}
 		}
 
-		OsmAppPreprocessor.LOG.info("Finished Pass 1c. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
+		OsmAppPreprocessor.LOG.info("Finished Pass 1c calculateWayEdges. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 	}
 
 	private void evaluateEdge(int wp0, int wp1, double dist, HighwayInfo hw, int iEdge) {
@@ -595,23 +591,33 @@ public class OsmAppPreprocessorPass1 {
 	 * Finds all nodes for edges.
 	 */
 	private void findEdgeNodes() {
+		OsmAppPreprocessor.LOG.info("findEdgeNodes starting");
+
 		relevantNodeEdgeIDs = new IntArrayList[relevantNodeCount];
-		relevantNodeEdgeTargets = new IntArrayList[relevantNodeCount];
+		//		relevantNodeEdgeTargets = new IntArrayList[relevantNodeCount];
 		for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
-			relevantNodeEdgeIDs[iNode] = new IntArrayList();
-			relevantNodeEdgeTargets[iNode] = new IntArrayList();
+			relevantNodeEdgeIDs[iNode] = new IntArrayList(1);
+			//			relevantNodeEdgeTargets[iNode] = new IntArrayList();
+
+			if ((iNode % 1000000) == 0) {
+				System.out.println(String.format("relevantNodeCount create lists %.2f", (double) iNode / relevantNodeCount * 100) + "%");
+			}
 		}
 
 		for (int iEdge = 0; iEdge < edgeCount; iEdge++) {
 			int edgeSource = wayEdgeNodes0[iEdge];
-			int edgeTarget = wayEdgeNodes1[iEdge];
+			//			int edgeTarget = wayEdgeNodes1[iEdge];
 
-			if (!relevantNodeEdgeTargets[edgeSource].contains(edgeTarget)) {
-				relevantNodeEdgeIDs[edgeSource].add(iEdge);
-				relevantNodeEdgeTargets[edgeSource].add(edgeTarget);
-			}
-			else {
-				duplicatesEdges++;
+			//			if (!relevantNodeEdgeTargets[edgeSource].contains(edgeTarget)) {
+			relevantNodeEdgeIDs[edgeSource].add(iEdge);
+			//				relevantNodeEdgeTargets[edgeSource].add(edgeTarget);
+			//			}
+			//			else {
+			//				duplicatesEdges++;
+			//			}
+
+			if ((iEdge % 1000000) == 0) {
+				System.out.println(String.format("relevantNodeCount find edge nodes %.2f", (double) iEdge / edgeCount * 100) + "%");
 			}
 		}
 
@@ -619,18 +625,37 @@ public class OsmAppPreprocessorPass1 {
 	}
 
 
-	private void output(String outFile) {
+	private void outputText(String outFile) {
+		OsmAppPreprocessor.LOG.info("output starting");
+
+		StringBuilder sb = new StringBuilder();
 		try (PrintWriter writer = new PrintWriter(outFile)) {
 			for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
 				IntArrayList edges = relevantNodeEdgeIDs[iNode];
-				if (edges.size() > 0) {
-					writer.println(iNode);
-					for (int edge : edges) {
-						int otherNode;
-						if (wayEdgeNodes0[edge] == iNode) otherNode = wayEdgeNodes1[edge];
-						else otherNode = wayEdgeNodes0[edge];
-						writer.println("\t" + otherNode + "\t" + wayEdgeLengths[edge]); // TODO Use time, dist/speed?
-					}
+				//if (edges.size() > 0) {
+				sb.append(iNode);
+				sb.append(';');
+				sb.append(relevantNodeLat[iNode]);
+				sb.append(';');
+				sb.append(relevantNodeLon[iNode]);
+				sb.append('|');
+
+				for (int edge : edges) {
+					int otherNode;
+					if (wayEdgeNodes0[edge] == iNode) otherNode = wayEdgeNodes1[edge];
+					else otherNode = wayEdgeNodes0[edge];
+					sb.append(otherNode);
+					sb.append(';');
+					sb.append(wayEdgeLengths[edge]);
+					sb.append('|');
+				}
+
+				writer.println(sb.toString());
+				sb.setLength(0);
+				//}
+
+				if ((iNode % 1000000) == 0) {
+					System.out.println(String.format("output %.2f", (double) iNode / relevantNodeCount * 100) + "%");
 				}
 			}
 		}
@@ -641,6 +666,67 @@ public class OsmAppPreprocessorPass1 {
 
 		OsmAppPreprocessor.LOG.info("output finished");
 	}
+
+
+	private void outputBinary(String outFile) {
+		OsmAppPreprocessor.LOG.info("output starting");
+
+		try (DataOutputStream writer = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(outFile)))) {
+			writer.writeInt(relevantNodeCount);
+
+			for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
+				IntArrayList edges = relevantNodeEdgeIDs[iNode];
+				//if (edges.size() > 0) {
+				writer.writeInt(iNode);
+				writer.writeDouble(relevantNodeLat[iNode]);
+				writer.writeDouble(relevantNodeLon[iNode]);
+
+				writer.writeInt(edges.size());
+				for (int edge : edges) {
+					int otherNode;
+					if (wayEdgeNodes0[edge] == iNode) otherNode = wayEdgeNodes1[edge];
+					else otherNode = wayEdgeNodes0[edge];
+					writer.writeInt(otherNode);
+					writer.writeDouble(wayEdgeLengths[edge]);
+				}
+
+				//}
+
+				if ((iNode % 1000000) == 0) {
+					System.out.println(String.format("output %.2f", (double) iNode / relevantNodeCount * 100) + "%");
+				}
+			}
+		}
+		catch (Exception e) {
+			OsmAppPreprocessor.LOG.severe("Failure at main: " + e);
+			e.printStackTrace();
+		}
+
+		OsmAppPreprocessor.LOG.info("output finished");
+	}
+
+	//	private void output(String outFile) {
+	//		try (PrintWriter writer = new PrintWriter(outFile)) {
+	//			for (int iNode = 0; iNode < relevantNodeCount; iNode++) {
+	//				IntArrayList edges = relevantNodeEdgeIDs[iNode];
+	//				if (edges.size() > 0) {
+	//					writer.println(iNode);
+	//					for (int edge : edges) {
+	//						int otherNode;
+	//						if (wayEdgeNodes0[edge] == iNode) otherNode = wayEdgeNodes1[edge];
+	//						else otherNode = wayEdgeNodes0[edge];
+	//						writer.println("\t" + otherNode + "\t" + wayEdgeLengths[edge]); // TODO Use time, dist/speed?
+	//					}
+	//				}
+	//			}
+	//		}
+	//		catch (FileNotFoundException e) {
+	//			OsmAppPreprocessor.LOG.severe("Failure at main: " + e);
+	//			e.printStackTrace();
+	//		}
+	//
+	//		OsmAppPreprocessor.LOG.info("output finished");
+	//	}
 
 
 

@@ -102,8 +102,7 @@ public class OsmAppPreprocessorPass2 {
 
 						if (nodeIndex >= 0) {
 							if (nodeIndex != relevantWayNodeCounter && !showedNodeIndexError) {
-								OsmAppPreprocessor.LOG.severe(
-										"Invalid nodeIndex: " + nodeIndex + " instead of " + relevantWayNodeCounter);
+								OsmAppPreprocessor.LOG.severe("Invalid nodeIndex: " + nodeIndex + " instead of " + relevantWayNodeCounter);
 								showedNodeIndexError = true;
 							}
 
@@ -123,11 +122,11 @@ public class OsmAppPreprocessorPass2 {
 					}
 
 					elementsPass2++;
-					if ((elementsPass2 % 1000000) == 0) {
-						OsmAppPreprocessor.LOG.info("Loaded " + elementsPass2 + " elements ("
-								+ (int) (((float) elementsPass2 / totalElements) * 100) + "%)");
-						OsmAppPreprocessor.LOG.info("" + relevantWayNodeCounter);
-					}
+					//					if ((elementsPass2 % 1000000) == 0) {
+					//						OsmAppPreprocessor.LOG.info("Loaded " + elementsPass2 + " elements ("
+					//								+ (int) (((float) elementsPass2 / totalElements) * 100) + "%)");
+					//						OsmAppPreprocessor.LOG.info("" + relevantWayNodeCounter);
+					//					}
 				}
 
 				@Override
@@ -146,8 +145,7 @@ public class OsmAppPreprocessorPass2 {
 
 			RunnableSource reader;
 			try {
-				reader = new crosby.binary.osmosis.OsmosisReader(
-						new BufferedInputStream(new FileInputStream(new File(inFile))));
+				reader = new crosby.binary.osmosis.OsmosisReader(new BufferedInputStream(new FileInputStream(new File(inFile))));
 			}
 			catch (FileNotFoundException e1) {
 				e1.printStackTrace();
@@ -172,12 +170,12 @@ public class OsmAppPreprocessorPass2 {
 
 
 			if (relevantWayNodeCounter < waypointIdsSet.length) {
-				OsmAppPreprocessor.LOG.severe("Not all relevantWayNodes have nodes in file: " + relevantWayNodeCounter
-						+ " insead of " + waypointIdsSet.length);
+				OsmAppPreprocessor.LOG.severe(
+						"Not all relevantWayNodes have nodes in file: " + relevantWayNodeCounter + " insead of " + waypointIdsSet.length);
 			}
 			if (relevantWayNodeCounter > waypointIdsSet.length) {
-				OsmAppPreprocessor.LOG.severe("Duplicate nodes for relevantWayNodes in file: " + relevantWayNodeCounter
-						+ " insead of " + waypointIdsSet.length);
+				OsmAppPreprocessor.LOG.severe(
+						"Duplicate nodes for relevantWayNodes in file: " + relevantWayNodeCounter + " insead of " + waypointIdsSet.length);
 			}
 
 			OsmAppPreprocessor.LOG.info("Pass 2 processing finished");
