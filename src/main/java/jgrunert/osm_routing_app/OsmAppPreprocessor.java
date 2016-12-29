@@ -8,7 +8,7 @@ import java.util.logging.SimpleFormatter;
 
 
 /**
- * Utility to convert osm.pbf file into routing graph for AndroMapView
+ * Utility to convert osm.pbf file into routing graph for JMapNavigator
  *
  * @author Jonas Grunert
  *
@@ -65,17 +65,13 @@ public class OsmAppPreprocessor {
 
 			LOG.info("In: " + inFilePath);
 			LOG.info("Out: " + outDirPath);
+			LOG.info("reduceL2Nodes: " + reduceL2Nodes);
 
 
 			// Start preprocessing
 			LOG.info("Starting processing");
 
 			new Osm2Graph().doProcessing(inFilePath, outDirPath, reduceL2Nodes);
-			//			OsmAppPreprocessorPass2.doPass(inFilePath, outDirPath);
-			//			OsmAppPreprocessorPass3.doPass(outDirPath);
-			//			OsmAppPreprocessorPass4.doPass(outDirPath);
-			//			OsmAppPreprocessorPass5.doPass(outDirPath);
-			//			OsmAppPreprocessorPass6.doPass(outDirPath);
 
 			LOG.info("Finished processing");
 		}
@@ -87,7 +83,7 @@ public class OsmAppPreprocessor {
 
 
 	private static void printHelp() {
-		System.out.println("Utility to convert osm.pbf to files for AndroMapView");
+		System.out.println("Utility to convert osm.pbf to files for JMapNavigator");
 		System.out.println("Usage: [InputFile] [OutputDirectory] [optional -l2]");
 		System.out.println("   [InputFile]: osm.pbf input file");
 		System.out.println("   [OutputDirectory]: Folder directory to write output to");
