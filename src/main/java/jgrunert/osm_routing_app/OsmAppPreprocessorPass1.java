@@ -82,6 +82,7 @@ public class OsmAppPreprocessorPass1 {
 	private short[] wayEdgeMaxSpeeds;
 	private double[] wayEdgeLengths;
 
+	private double minSpeed = 5; // TODO Configurable
 	private double maxSpeed = 130; // TODO Configurable
 
 
@@ -126,7 +127,7 @@ public class OsmAppPreprocessorPass1 {
 		removeRedundantEdges();
 
 		// TODO remove Level-2, remove unused nodes
-		//removeLevel2Nodes();
+		removeLevel2Nodes();
 
 		outputBinary(outDir + File.separator + "graph.bin");
 
@@ -566,22 +567,16 @@ public class OsmAppPreprocessorPass1 {
 				int inEdge = inEdges.getInt(0);
 				int outEdge = outEdges.getInt(0);
 				if (wayEdgeMaxSpeeds[inEdge] == wayEdgeMaxSpeeds[outEdge]) { // Ignoring wayEdgeInfoBits
-					//					diffSpeedT++;
-					wayEdgeLengths[inEdge] += wayEdgeLengths[outEdge];
-					int outEdgeTargetNode = wayEdgeNodes1[outEdge];
-
-					// TODO Test
-					//					System.out.println(iNode + ": " + wayEdgeNodes0[inEdge] + "->" + wayEdgeNodes1[inEdge] + " " + wayEdgeNodes0[outEdge]
-					//							+ "->" + wayEdgeNodes1[outEdge]);
-					if (wayEdgeNodes1[inEdge] != iNode) throw new RuntimeException("Illegal incoming edge");
-					if (wayEdgeNodes0[outEdge] != iNode) throw new RuntimeException("Illegal outgoing edge");
+					assert (wayEdgeNodes1[inEdge] == iNode);
+					assert (wayEdgeNodes0[outEdge] == iNode);
 
 					// Merge edges
+					int outEdgeTargetNode = wayEdgeNodes1[outEdge];
 					wayEdgeLengths[inEdge] += wayEdgeLengths[outEdge];
 					wayEdgeNodes1[inEdge] = outEdgeTargetNode;
 					// Update incoming edge at target node
 					int targetNodeEdgeIndex = findIndexOf(wayNodeIncomingEdgeIDs[outEdgeTargetNode], outEdge);
-					if (targetNodeEdgeIndex == -1) throw new RuntimeException("Illegal outgoing edge");
+					assert (targetNodeEdgeIndex != -1);
 					wayNodeIncomingEdgeIDs[outEdgeTargetNode].set(targetNodeEdgeIndex, inEdge);
 
 					wayNodeOutgoingEdgeIDs[iNode] = null;
@@ -720,7 +715,7 @@ public class OsmAppPreprocessorPass1 {
 	}
 
 	private double getEdgeTime(int edge) {
-		return wayEdgeLengths[edge] / (Math.min(wayEdgeMaxSpeeds[edge], maxSpeed) / 3.6);
+		return wayEdgeLengths[edge] / (Math.max(Math.min(wayEdgeMaxSpeeds[edge], maxSpeed), minSpeed) / 3.6);
 	}
 
 	private int getOtherEdgeNode(int edge, int thisNodeId) {
