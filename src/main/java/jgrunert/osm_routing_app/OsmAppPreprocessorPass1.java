@@ -513,21 +513,28 @@ public class OsmAppPreprocessorPass1 {
 
 		HashSet<Integer> targetsTmp = new HashSet<>();
 		for (int iNode = 0; iNode < wayNodeCount; iNode++) {
-			IntArrayList edges = wayNodeOutgoingEdgeIDs[iNode];
-			for (int iEdge = 0; iEdge < edges.size(); iEdge++) {
-				int edge = edges.getInt(iEdge);
-				int target;
-				if (wayEdgeNodes0[edge] == iNode) target = wayEdgeNodes1[edge];
-				else target = wayEdgeNodes0[edge];
+			IntArrayList outEdges = wayNodeOutgoingEdgeIDs[iNode];
+			for (int iEdge = 0; iEdge < outEdges.size(); iEdge++) {
+				int edge = outEdges.getInt(iEdge);
+
+				//				int target;
+				//				if (wayEdgeNodes0[edge] == iNode) target = wayEdgeNodes1[edge];
+				//				else target = wayEdgeNodes0[edge];
+				assert (wayEdgeNodes0[edge] == iNode);
+				int target = wayEdgeNodes1[edge];
 
 				if (target == iNode) {
 					circleEdges++;
-					edges.removeInt(iEdge);
+					outEdges.removeInt(iEdge);
+					IntArrayList inEdges = wayNodeIncomingEdgeIDs[iNode];
+					inEdges.rem(edge);
 					iEdge--;
 				}
 				else if (targetsTmp.contains(target)) {
 					duplicateEdges++;
-					edges.removeInt(iEdge);
+					outEdges.removeInt(iEdge);
+					IntArrayList targetInEdges = wayNodeIncomingEdgeIDs[target];
+					targetInEdges.rem(edge);
 					iEdge--;
 				}
 				else {
@@ -553,8 +560,6 @@ public class OsmAppPreprocessorPass1 {
 	private void removeLevel2Nodes() {
 		OsmAppPreprocessor.LOG.info("removeLevel2Nodes starting");
 
-		int diffSpeedT = 0;
-		int diffSpeedF = 0;
 		int removedUnidirL2s = 0;
 		int removedBidirL2s = 0;
 
@@ -566,12 +571,17 @@ public class OsmAppPreprocessorPass1 {
 				// No crossing, unidirectional nodes
 				int inEdge = inEdges.getInt(0);
 				int outEdge = outEdges.getInt(0);
-				if (wayEdgeMaxSpeeds[inEdge] == wayEdgeMaxSpeeds[outEdge]) { // Ignoring wayEdgeInfoBits
-					assert (wayEdgeNodes1[inEdge] == iNode);
-					assert (wayEdgeNodes0[outEdge] == iNode);
+				int inEdgeSrcNode = wayEdgeNodes0[inEdge];
+				int outEdgeTargetNode = wayEdgeNodes1[outEdge];
 
+				assert (wayEdgeNodes1[inEdge] == iNode);
+				assert (wayEdgeNodes0[outEdge] == iNode);
+				assert (wayEdgeNodes0[inEdge] != iNode);
+				assert (wayEdgeNodes1[outEdge] != iNode);
+
+				// Merge edge if level2-node, if node is no dead end (in and out edge with not same node) and edges have similar speeds
+				if (inEdgeSrcNode != outEdgeTargetNode && wayEdgeMaxSpeeds[inEdge] == wayEdgeMaxSpeeds[outEdge]) { // Ignoring wayEdgeInfoBits
 					// Merge edges
-					int outEdgeTargetNode = wayEdgeNodes1[outEdge];
 					wayEdgeLengths[inEdge] += wayEdgeLengths[outEdge];
 					wayEdgeNodes1[inEdge] = outEdgeTargetNode;
 					// Update incoming edge at target node
@@ -588,16 +598,67 @@ public class OsmAppPreprocessorPass1 {
 				//				}
 			}
 			else if (outEdges.size() == 2 && inEdges.size() == 2) {
-				int outEdge0 = outEdges.getInt(0);
-				int outEdge1 = outEdges.getInt(1);
-				int outOtherNode0 = getOtherEdgeNode(outEdge0, iNode);
-				int outOtherNode1 = getOtherEdgeNode(outEdge1, iNode);
+				int inEdge0 = inEdges.getInt(0);
+				int inEdge1 = inEdges.getInt(1);
+				int inEdgeSrcNode0 = wayEdgeNodes0[inEdge0];
+				int inEdgeSrcNode1 = wayEdgeNodes0[inEdge1];
 
-				//				outEdges.clear();
-				//				inEdges.clear();
-				//				wayNodeOutgoingEdgeIDs[iNode] = null;
-				//				wayNodeIncomingEdgeIDs[iNode] = null;
-				removedBidirL2s++;
+				int outEdge0;
+				int outEdge1;
+				if (wayEdgeNodes1[outEdges.getInt(1)] == inEdgeSrcNode1) {
+					outEdge0 = outEdges.getInt(1);
+					outEdge1 = outEdges.getInt(0);
+				}
+				else {
+					outEdge0 = outEdges.getInt(0);
+					outEdge1 = outEdges.getInt(1);
+				}
+				int outEdgeTargetNode0 = wayEdgeNodes1[outEdge0];
+				int outEdgeTargetNode1 = wayEdgeNodes1[outEdge1];
+
+				// Correct edges
+				assert (wayEdgeNodes1[inEdge0] == iNode);
+				assert (wayEdgeNodes1[inEdge1] == iNode);
+				assert (wayEdgeNodes0[outEdge0] == iNode);
+				assert (wayEdgeNodes0[outEdge1] == iNode);
+
+				//				System.out.println((inEdgeSrcNode0 == outEdgeTargetNode1 && inEdgeSrcNode1 == outEdgeTargetNode0) + " "
+				//						+ (inEdgeSrcNode0 == outEdgeTargetNode1 && inEdgeSrcNode1 == outEdgeTargetNode0
+				//								&& wayEdgeMaxSpeeds[inEdge0] == wayEdgeMaxSpeeds[inEdge1]
+				//								&& wayEdgeMaxSpeeds[inEdge0] == wayEdgeMaxSpeeds[outEdge0]
+				//								&& wayEdgeMaxSpeeds[inEdge0] == wayEdgeMaxSpeeds[outEdge1])
+				//						+ ": " + inEdgeSrcNode0 + " " + outEdgeTargetNode1 + " " + inEdgeSrcNode1 + " " + outEdgeTargetNode0);
+
+				// Merge edge if
+				//  - level2-node, has only two bidirectional connections with other nodes
+				//  - edges dont form a loop
+				//  - edges have similar speeds
+				if (inEdgeSrcNode0 == outEdgeTargetNode1 && inEdgeSrcNode1 == outEdgeTargetNode0 && inEdgeSrcNode0 != iNode
+						&& inEdgeSrcNode1 != iNode && wayEdgeMaxSpeeds[inEdge0] == wayEdgeMaxSpeeds[inEdge1]
+						&& wayEdgeMaxSpeeds[inEdge0] == wayEdgeMaxSpeeds[outEdge0]
+						&& wayEdgeMaxSpeeds[inEdge0] == wayEdgeMaxSpeeds[outEdge1]) { // Ignoring wayEdgeInfoBits
+					// Merge edges0
+					wayEdgeLengths[inEdge0] += wayEdgeLengths[outEdge0];
+					wayEdgeNodes1[inEdge0] = outEdgeTargetNode0;
+					int targetNodeEdgeIndex0 = findIndexOf(wayNodeIncomingEdgeIDs[outEdgeTargetNode0], outEdge0);
+					assert (targetNodeEdgeIndex0 != -1);
+					wayNodeIncomingEdgeIDs[outEdgeTargetNode0].set(targetNodeEdgeIndex0, inEdge0);
+
+					if (wayNodeIncomingEdgeIDs[outEdgeTargetNode1] == null) System.out.println(outEdgeTargetNode1 + " " + iNode);
+
+					// Merge edges1
+					wayEdgeLengths[inEdge1] += wayEdgeLengths[outEdge1];
+					wayEdgeNodes1[inEdge1] = outEdgeTargetNode1;
+					int targetNodeEdgeIndex1 = findIndexOf(wayNodeIncomingEdgeIDs[outEdgeTargetNode1], outEdge1);
+					assert (targetNodeEdgeIndex1 != -1);
+					wayNodeIncomingEdgeIDs[outEdgeTargetNode1].set(targetNodeEdgeIndex1, inEdge1);
+
+					//					System.out.println(wayEdgeLengths[inEdge0] + " " + wayEdgeLengths[inEdge1]);
+
+					wayNodeOutgoingEdgeIDs[iNode] = null;
+					wayNodeIncomingEdgeIDs[iNode] = null;
+					removedBidirL2s++;
+				}
 			}
 
 			if ((iNode % 1000000) == 0) {
@@ -605,7 +666,6 @@ public class OsmAppPreprocessorPass1 {
 			}
 		}
 
-		System.out.println(diffSpeedT + " " + diffSpeedF);
 		OsmAppPreprocessor.LOG.info("removeLevel2Nodes finished, removed " + removedUnidirL2s + " removedUnidirL2s and " + removedBidirL2s
 				+ " removedBidirL2s");
 
