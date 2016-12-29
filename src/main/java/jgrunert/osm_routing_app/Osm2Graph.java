@@ -29,36 +29,17 @@ import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 
 /**
- * First processing pass, parses input file, pre filtering, searches edges.
+ * Processes OSM input to graph, parses input file, pre filtering, searches edges, calculate distances, clean up graph.
  *
  * @author Jonas Grunert
  *
  */
-public class OsmAppPreprocessorPass1 {
-
-	//	int maxNodesPerWay = 0;
-	//	int maxWaysPerNode = 0;
-
-	// int elementsPass1 = 0;
-	// int elementsPass2 = 0;
-
-	//	int BUFFER_MAX_WAYNODES = 100000000;
-	//	int BUFFER_MAX_WAYSPERNODE = 20;
-
-	// static int relevantWayNodeCount = 0;
-
-	// static LongSet relevantWays = new LongOpenHashSet();
-
+public class Osm2Graph {
 
 	private int processedOsmElementsTmp = 0;
 	private int totalOsmElements = 0;
 	private int totalWayCount = 0;
 	private int totalNodeCount = 0;
-
-	// Map of all way nodes and their edges
-	//private Long2ObjectMap<IntArrayList> relevantNodes = new Long2ObjectOpenHashMap<IntArrayList>();
-
-	//private Long2IntMap relevantWayIdMap = new Long2IntOpenHashMap();
 
 	// Temporary storage of ways, later converted to edges
 	// Mapping from long OSM ID to integer assigned ID
@@ -86,63 +67,48 @@ public class OsmAppPreprocessorPass1 {
 	private double maxSpeed = 130; // TODO Configurable
 
 
-	// static List<HighwayInfos> highways = new ArrayList<>();
-	// IDs of all relevant waypoint nodes
-	// static List<Long> waypointIds = new ArrayList<>();
-
-
-	//	public static void main(String[] args) {
-	//		try {
-	//			String outDir = args[0];
-	//			String inFile = args[1];
-	//			new OsmAppPreprocessorPass1().doPass(inFile, outDir);
-	//		}
-	//		catch (Exception e) {
-	//			OsmAppPreprocessor.LOG.severe("Failure at main");
-	//			OsmAppPreprocessor.LOG.log(Level.SEVERE, "Exception", e);
-	//		}
-	//	}
-
-
-	public void doPass(String inFile, String outDir) throws Exception {
+	public void doProcessing(String inFile, String outDir, boolean reduceL2Nodes) throws Exception {
 		OsmAppPreprocessor.LOG.info("OSM Preprocessor Pass1");
 		long startTime = System.currentTimeMillis();
 
 		// List of all highways, assign Int32 Ids to edges and nodes
-		// Pass 1 - read highways
+		// Step 1 - read highways
 		readWays(inFile, outDir);
+		System.out.println("# Finished step 1/x - readWays");
 
+		// Read coordinates of all points which are waypoints
 		readWaypointCoords(inFile, outDir);
+		System.out.println("# Finished step 2/x - readWaypointCoords");
 
 		// Calculate all edges from ways
 		calculateWayEdges();
 		// Can throw away temporary highways and node mappings now, already converted ways to edges
 		relevantNodeIdMap = null;
 		relevantWays = null;
+		System.out.println("# Finished step 3/x - calculateWayEdges");
 
 		// Find all edges of each node
 		findEdgeNodes();
+		System.out.println("# Finished step 4/x - findEdgeNodes");
 
 		// Remove duplicate edges and circle edges
 		removeRedundantEdges();
+		System.out.println("# Finished step 5/x - findEdgeNodes");
 
-		// TODO remove Level-2, remove unused nodes
-		removeLevel2Nodes();
+		// Remove Level-2 nodes
+		if (reduceL2Nodes) {
+			removeLevel2Nodes();
+			System.out.println("# Finished step 6/x - removeLevel2Nodes");
+		}
+		else {
+			System.out.println("# Skipped step 6/x - removeLevel2Nodes");
+		}
 
+		// Write
 		outputBinary(outDir + File.separator + "graph.bin");
+		System.out.println("# Finished step 7/x - output");
 
-
-		OsmAppPreprocessor.LOG.info("Finished Pass 1. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
-
-
-
-		OsmAppPreprocessor.LOG.info("Pass 1 finished");
-		OsmAppPreprocessor.LOG.info("Relevant edges: " + edgeCount + ", total ways: " + totalWayCount); // TODO Calculate non-removed edges
-		OsmAppPreprocessor.LOG.info("Relevant waynodes: " + wayNodeCount + ", total nodes: " + totalNodeCount); // TODO Calculate non-removed nodes
-		//		OsmAppPreprocessor.LOG.info("Max nodes per way: " + maxNodesPerWay);
-		//		OsmAppPreprocessor.LOG.info("Max ways per node: " + maxWaysPerNode);
-
-		OsmAppPreprocessor.LOG.info("Finished in " + (System.currentTimeMillis() - startTime) + "ms");
+		OsmAppPreprocessor.LOG.info("Processing finished in " + (System.currentTimeMillis() - startTime) + "ms");
 	}
 
 
@@ -151,10 +117,7 @@ public class OsmAppPreprocessorPass1 {
 	 * Reads and sorts all ways
 	 */
 	private void readWays(String inFile, String outDir) throws FileNotFoundException, IOException {
-		OsmAppPreprocessor.LOG.info("Starting Pass 1a");
-
-		//		ObjectOutputStream highwaysTempWriter = new ObjectOutputStream(
-		//				new BufferedOutputStream(new FileOutputStream(outDir + File.separator + "pass1-temp-highways.bin")));
+		OsmAppPreprocessor.LOG.info("Starting readWays");
 
 		long startTime = System.currentTimeMillis();
 		Sink sinkImplementation = new Sink() {
@@ -203,10 +166,6 @@ public class OsmAppPreprocessorPass1 {
 						if (highway != null && accessOk) {
 							HighwayInfo hw = evaluateHighway(highway, maxspeed, sidewalk, oneway);
 							if (hw != null) {
-								// Register OSM map ID and assign new id
-								//								int edgeId = relevantWayIdMap.size();
-								//								relevantWayIdMap.put(entity.getId(), edgeId);
-
 								// Register all nodes of this way
 								List<WayNode> wayNodes = way.getWayNodes();
 								hw.wayNodeIds = new long[wayNodes.size()];
@@ -222,45 +181,7 @@ public class OsmAppPreprocessorPass1 {
 								}
 
 								relevantWays.add(hw);
-
-
-
-								//for (WayNode waynode : wayNodes) {
-								//									IntArrayList nodeWays = relevantNodes.get(waynode.getNodeId());
-								//									if (nodeWays == null) {
-								//										nodeWays = new IntArrayList();
-								//										relevantNodes.put(waynode.getNodeId(), nodeWays);
-								//										relevantNodeIdMap.put(waynode.getNodeId(), relevantNodeIdMap.size());
-								//									}
-								//									nodeWays.add(edgeId);
-
-
-
-								// Short ways =
-								// waysPerNode.get(waynode.getNodeId());
-								// if(ways == null) { ways = 0; }
-								// ways++;
-								// OsmAppPreprocessor.LOG.info(ways);
-								// maxWaysPerNode =
-								// Math.max(maxWaysPerNode, ways);
-								// waysPerNode.put(waynode.getNodeId(),
-								// ways);
-								// waynodes.add(waynode.getNodeId());
-
-								// waypointIds.add(waynode.getNodeId());
-								//}
-
-
-
-								//								highwaysTempWriter.writeObject(hw);
-
-								//maxNodesPerWay = Math.max(maxNodesPerWay, way.getWayNodes().size());
 							}
-							// else {
-							// highwayCsvAllWriter.println(highway + ";"
-							// + maxspeed + ";" + sidewalk + ";"
-							// + oneway + ";Ignored;");
-							// }
 						}
 					}
 					catch (Exception e) {
@@ -321,7 +242,7 @@ public class OsmAppPreprocessorPass1 {
 
 		// highwayCsvWriter.close();
 
-		OsmAppPreprocessor.LOG.info(String.format("Finished Pass 1a - loading Nodes %d/%d Ways %d/%d", totalNodeCount,
+		OsmAppPreprocessor.LOG.info(String.format("Finished readWays - loading Nodes %d/%d Ways %d/%d", totalNodeCount,
 				relevantNodeIdMap.size(), totalWayCount, relevantWays.size()));
 		OsmAppPreprocessor.LOG.info("Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 		totalOsmElements = processedOsmElementsTmp;
@@ -338,7 +259,7 @@ public class OsmAppPreprocessorPass1 {
 		//		wayNodes0 = new int[relevantWayIdMap.size()];
 		//		wayNodes1 = new int[relevantWayIdMap.size()];
 
-		OsmAppPreprocessor.LOG.info("Starting Pass 1b readWaypointCoords");
+		OsmAppPreprocessor.LOG.info("Starting readWaypointCoords");
 		processedOsmElementsTmp = 0;
 		long startTime = System.currentTimeMillis();
 		Sink sinkImplementation = new Sink() {
@@ -411,7 +332,7 @@ public class OsmAppPreprocessorPass1 {
 		else OsmAppPreprocessor.LOG.info("Not all relevant nodes found, only " + wayNodesFound + " of " + relevantNodeIdMap.size());
 		wayNodeCount = relevantNodeIdMap.size();
 
-		OsmAppPreprocessor.LOG.info("Finished Pass 1b. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
+		OsmAppPreprocessor.LOG.info("Finished readWaypointCoords. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 	}
 
 
@@ -419,7 +340,7 @@ public class OsmAppPreprocessorPass1 {
 	 * Finds and calculates all edges on ways
 	 */
 	private void calculateWayEdges() {
-		OsmAppPreprocessor.LOG.info("Starting Pass 1c calculateWayEdges");
+		OsmAppPreprocessor.LOG.info("Starting calculateWayEdges");
 		long startTime = System.currentTimeMillis();
 
 		edgeCount = 0;
@@ -451,7 +372,7 @@ public class OsmAppPreprocessorPass1 {
 			}
 		}
 
-		OsmAppPreprocessor.LOG.info("Finished Pass 1c calculateWayEdges. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
+		OsmAppPreprocessor.LOG.info("Finished calculateWayEdges. Time elapsed: " + (System.currentTimeMillis() - startTime) + "ms");
 	}
 
 	private void evaluateEdge(int wp0, int wp1, double dist, HighwayInfo hw, int iEdge) {

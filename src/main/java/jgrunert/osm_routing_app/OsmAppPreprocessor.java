@@ -31,7 +31,7 @@ public class OsmAppPreprocessor {
 
 	public static void main(String[] args) {
 		try {
-			if (args.length != 2) {
+			if (args.length < 2) {
 				LOG.info("Invalid number of arguments");
 				printHelp();
 				return;
@@ -43,6 +43,11 @@ public class OsmAppPreprocessor {
 
 			String outDirPath = args[1];
 			File outDir = new File(outDirPath);
+
+			boolean reduceL2Nodes = true;
+			for (int i = 2; i < args.length; i++) {
+				if (args[i].equals("-l2")) reduceL2Nodes = false;
+			}
 
 
 			// Check parameters
@@ -65,7 +70,7 @@ public class OsmAppPreprocessor {
 			// Start preprocessing
 			LOG.info("Starting processing");
 
-			new OsmAppPreprocessorPass1().doPass(inFilePath, outDirPath);
+			new Osm2Graph().doProcessing(inFilePath, outDirPath, reduceL2Nodes);
 			//			OsmAppPreprocessorPass2.doPass(inFilePath, outDirPath);
 			//			OsmAppPreprocessorPass3.doPass(outDirPath);
 			//			OsmAppPreprocessorPass4.doPass(outDirPath);
@@ -83,6 +88,9 @@ public class OsmAppPreprocessor {
 
 	private static void printHelp() {
 		System.out.println("Utility to convert osm.pbf to files for AndroMapView");
-		System.out.println("Usage: [InputFile] [Output Directory]");
+		System.out.println("Usage: [InputFile] [OutputDirectory] [optional -l2]");
+		System.out.println("   [InputFile]: osm.pbf input file");
+		System.out.println("   [OutputDirectory]: Folder directory to write output to");
+		System.out.println("   -l2: Disables level2-node-removal which reduces graph to road network by removing non crossing nodes");
 	}
 }
