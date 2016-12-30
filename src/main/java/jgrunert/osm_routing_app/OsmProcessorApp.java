@@ -13,7 +13,7 @@ import java.util.logging.SimpleFormatter;
  * @author Jonas Grunert
  *
  */
-public class OsmAppPreprocessor {
+public class OsmProcessorApp {
 
 	public static final Logger LOG = Logger.getLogger("OsmAppPreprocessor");
 
